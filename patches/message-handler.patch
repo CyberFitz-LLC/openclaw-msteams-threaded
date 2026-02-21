@@ -2,8 +2,17 @@ diff --git a/extensions/msteams/src/monitor-handler/message-handler.ts b/extensi
 index ac3f20adf..ef862800c 100644
 --- a/extensions/msteams/src/monitor-handler/message-handler.ts
 +++ b/extensions/msteams/src/monitor-handler/message-handler.ts
-@@ -276,13 +276,19 @@ export function createMSTeamsMessageHandler(deps: MSTeamsMessageHandlerDeps) {
- 
+@@ -35,7 +35,7 @@
+ import { createMSTeamsReplyDispatcher } from "../reply-dispatcher.js";
+ import { getMSTeamsRuntime } from "../runtime.js";
+ import type { MSTeamsTurnContext } from "../sdk-types.js";
+-import { recordMSTeamsSentMessage, wasMSTeamsMessageSent } from "../sent-message-cache.js";
++import { recordMSTeamsSentMessage, recordMSTeamsThreadActive, isMSTeamsThreadActive, wasMSTeamsMessageSent } from "../sent-message-cache.js";
+ import { resolveMSTeamsInboundMedia } from "./inbound-media.js";
+
+ export function createMSTeamsMessageHandler(deps: MSTeamsMessageHandlerDeps) {
+@@ -276,13 +276,19 @@
+
      // Build conversation reference for proactive replies.
      const agent = activity.recipient;
 +    const isThreadMessage =
@@ -23,7 +32,7 @@ index ac3f20adf..ef862800c 100644
          conversationType,
          tenantId: conversation?.tenantId,
        },
-@@ -335,17 +341,40 @@ export function createMSTeamsMessageHandler(deps: MSTeamsMessageHandlerDeps) {
+@@ -335,17 +341,40 @@
        : isChannel
          ? `msteams:channel:${conversationId}`
          : `msteams:group:${conversationId}`;
@@ -45,7 +54,7 @@ index ac3f20adf..ef862800c 100644
 +      : threadId
 +        ? `${conversationId}:thread:${threadId}`
 +        : conversationId;
- 
+
      const route = core.channel.routing.resolveAgentRoute({
        cfg,
        channel: "msteams",
@@ -55,7 +64,7 @@ index ac3f20adf..ef862800c 100644
 +        id: peerId,
        },
      });
- 
+
 +    if (!isDirectMessage && useThreadSessions) {
 +      log.info("thread session resolved", {
 +        sessionKey: route.sessionKey,
@@ -66,7 +75,7 @@ index ac3f20adf..ef862800c 100644
      const preview = rawBody.replace(/\s+/g, " ").slice(0, 160);
      const inboundLabel = isDirectMessage
        ? `Teams DM from ${senderName}`
-@@ -493,6 +522,13 @@ export function createMSTeamsMessageHandler(deps: MSTeamsMessageHandlerDeps) {
+@@ -493,6 +522,13 @@
        storePath,
        sessionKey: ctxPayload.SessionKey ?? route.sessionKey,
        ctx: ctxPayload,
@@ -80,3 +89,37 @@ index ac3f20adf..ef862800c 100644
        onRecordError: (err) => {
          logVerboseMessage(`msteams: failed updating session meta: ${String(err)}`);
        },
+@@ -517,6 +553,10 @@
+         for (const id of ids) {
+           recordMSTeamsSentMessage(conversationId, id);
+         }
++        // Mark thread as bot-active so subsequent messages are implicitly mentioned.
++        if (threadId && ids.length > 0) {
++          recordMSTeamsThreadActive(`${conversationId}:thread:${threadId}`);
++        }
+       },
+       tokenProvider,
+       sharePointSiteId,
+@@ -636,10 +676,22 @@
+     const wasMentioned = wasMSTeamsBotMentioned(activity);
+     const conversationId = normalizeMSTeamsConversationId(activity.conversation?.id ?? "");
+     const replyToId = activity.replyToId ?? undefined;
++    const rawConvId = activity.conversation?.id ?? "";
++    const threadMsgId = rawConvId.match(/;messageid=(\d+)$/)?.[1];
++    const threadKey = threadMsgId ? `${conversationId}:thread:${threadMsgId}` : undefined;
++
++    // Implicit mention: either replying to a bot message, or the bot is active in this thread.
+     const implicitMention = Boolean(
+       conversationId && replyToId && wasMSTeamsMessageSent(conversationId, replyToId),
++    ) || Boolean(
++      threadKey && isMSTeamsThreadActive(threadKey),
+     );
+
++    // If the bot was explicitly @mentioned in a thread, mark that thread as active.
++    if (wasMentioned && threadKey) {
++      recordMSTeamsThreadActive(threadKey);
++    }
++
+     await inboundDebouncer.enqueue({
+       context,
+       rawText,

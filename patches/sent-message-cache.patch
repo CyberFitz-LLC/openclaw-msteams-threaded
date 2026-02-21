@@ -1,0 +1,46 @@
+diff --git a/extensions/msteams/src/sent-message-cache.ts b/extensions/msteams/src/sent-message-cache.ts
+index 000000000..111111111 100644
+--- a/extensions/msteams/src/sent-message-cache.ts
++++ b/extensions/msteams/src/sent-message-cache.ts
+@@ -7,6 +7,9 @@
+
+ const sentMessages = new Map<string, CacheEntry>();
+
++/** Tracks threads where the bot has been active (mentioned or sent a reply). */
++const activeThreads = new Map<string, number>();
++
+ function cleanupExpired(entry: CacheEntry): void {
+   const now = Date.now();
+   for (const [msgId, timestamp] of entry.timestamps) {
+@@ -42,6 +45,31 @@
+   return entry.messageIds.has(messageId);
+ }
+
++/** Mark a thread as bot-active (bot was mentioned or replied in this thread). */
++export function recordMSTeamsThreadActive(threadKey: string): void {
++  if (!threadKey) return;
++  activeThreads.set(threadKey, Date.now());
++  // Prune expired threads periodically
++  if (activeThreads.size > 500) {
++    const now = Date.now();
++    for (const [key, ts] of activeThreads) {
++      if (now - ts > TTL_MS) activeThreads.delete(key);
++    }
++  }
++}
++
++/** Check if the bot has been active in this thread. */
++export function isMSTeamsThreadActive(threadKey: string): boolean {
++  const ts = activeThreads.get(threadKey);
++  if (ts === undefined) return false;
++  if (Date.now() - ts > TTL_MS) {
++    activeThreads.delete(threadKey);
++    return false;
++  }
++  return true;
++}
++
+ export function clearMSTeamsSentMessageCache(): void {
+   sentMessages.clear();
++  activeThreads.clear();
+ }

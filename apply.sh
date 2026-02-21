@@ -13,7 +13,7 @@ fi
 
 echo "Applying thread sessions patches..."
 
-for patch in core-schema message-handler messenger send-context; do
+for patch in core-schema sent-message-cache message-handler messenger send-context; do
   file="$PATCHES_DIR/${patch}.patch"
   if [ ! -f "$file" ]; then
     echo "  SKIP: $file not found"
