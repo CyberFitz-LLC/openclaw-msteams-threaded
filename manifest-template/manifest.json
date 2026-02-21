@@ -1,0 +1,53 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.17/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.17",
+  "version": "1.0.0",
+  "id": "YOUR_AZURE_APP_REGISTRATION_ID",
+  "name": {
+    "short": "YOUR_BOT_NAME",
+    "full": "YOUR_BOT_NAME - AI Assistant"
+  },
+  "developer": {
+    "name": "Your Organization",
+    "websiteUrl": "https://your-domain.example.com",
+    "privacyUrl": "https://your-domain.example.com/privacy",
+    "termsOfUseUrl": "https://your-domain.example.com/terms"
+  },
+  "description": {
+    "short": "AI assistant powered by Claude",
+    "full": "An AI assistant powered by Anthropic Claude. Each thread gets its own independent conversation context."
+  },
+  "icons": {
+    "outline": "outline.png",
+    "color": "color.png"
+  },
+  "accentColor": "#5B6DEF",
+  "bots": [
+    {
+      "botId": "YOUR_BOT_APP_ID",
+      "scopes": ["personal", "team", "groupChat"],
+      "isNotificationOnly": false,
+      "supportsCalling": false,
+      "supportsVideo": false,
+      "supportsFiles": true
+    }
+  ],
+  "permissions": [
+    "identity",
+    "messageTeamMembers"
+  ],
+  "validDomains": ["your-bot-domain.example.com"],
+  "webApplicationInfo": {
+    "id": "YOUR_BOT_APP_ID",
+    "resource": "api://your-bot-domain.example.com/YOUR_BOT_APP_ID"
+  },
+  "authorization": {
+    "permissions": {
+      "resourceSpecific": [
+        {"name": "ChannelMessage.Read.Group", "type": "Application"},
+        {"name": "ChannelMessage.Send.Group", "type": "Application"},
+        {"name": "ChatMessage.Read.Chat", "type": "Application"}
+      ]
+    }
+  }
+}
