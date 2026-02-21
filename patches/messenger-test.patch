@@ -1,0 +1,152 @@
+diff --git a/extensions/msteams/src/messenger.test.ts b/extensions/msteams/src/messenger.test.ts
+index 91f7aede4..bcf3069b1 100644
+--- a/extensions/msteams/src/messenger.test.ts
++++ b/extensions/msteams/src/messenger.test.ts
+@@ -113,18 +113,19 @@ describe("msteams messenger", () => {
+       serviceUrl: "https://service.example.com",
+     };
+ 
+-    it("sends thread messages via the provided context", async () => {
++    it("sends thread messages via continueConversation with full conversation ID", async () => {
+       const sent: string[] = [];
+-      const ctx = {
+-        sendActivity: async (activity: unknown) => {
+-          const { text } = activity as { text?: string };
+-          sent.push(text ?? "");
+-          return { id: `id:${text ?? ""}` };
+-        },
+-      };
+ 
+       const adapter: MSTeamsAdapter = {
+-        continueConversation: async () => {},
++        continueConversation: async (_appId, _reference, logic) => {
++          await logic({
++            sendActivity: async (activity: unknown) => {
++              const { text } = activity as { text?: string };
++              sent.push(text ?? "");
++              return { id: `id:${text ?? ""}` };
++            },
++          });
++        },
+         process: async () => {},
+       };
+ 
+@@ -133,7 +134,6 @@ describe("msteams messenger", () => {
+         adapter,
+         appId: "app123",
+         conversationRef: baseRef,
+-        context: ctx,
+         messages: [{ text: "one" }, { text: "two" }],
+       });
+ 
+@@ -174,7 +174,7 @@ describe("msteams messenger", () => {
+         conversation?: { id?: string };
+       };
+       expect(ref.activityId).toBeUndefined();
+-      expect(ref.conversation?.id).toBe("19:abc@thread.tacv2");
++      expect(ref.conversation?.id).toBe("19:abc@thread.tacv2;messageid=deadbeef");
+     });
+ 
+     it("preserves parsed mentions when appending OneDrive fallback file links", async () => {
+@@ -188,15 +188,16 @@ describe("msteams messenger", () => {
+ 
+       try {
+         const sent: Array<{ text?: string; entities?: unknown[] }> = [];
+-        const ctx = {
+-          sendActivity: async (activity: unknown) => {
+-            sent.push(activity as { text?: string; entities?: unknown[] });
+-            return { id: "id:one" };
+-          },
+-        };
+ 
+         const adapter: MSTeamsAdapter = {
+-          continueConversation: async () => {},
++          continueConversation: async (_appId, _reference, logic) => {
++            await logic({
++              sendActivity: async (activity: unknown) => {
++                sent.push(activity as { text?: string; entities?: unknown[] });
++                return { id: "id:one" };
++              },
++            });
++          },
+           process: async () => {},
+         };
+ 
+@@ -211,7 +212,6 @@ describe("msteams messenger", () => {
+               conversationType: "channel",
+             },
+           },
+-          context: ctx,
+           messages: [{ text: "Hello @[John](29:08q2j2o3jc09au90eucae)", mediaUrl: localFile }],
+           tokenProvider: {
+             getAccessToken: async () => "token",
+@@ -249,19 +249,19 @@ describe("msteams messenger", () => {
+       const attempts: string[] = [];
+       const retryEvents: Array<{ nextAttempt: number; delayMs: number }> = [];
+ 
+-      const ctx = {
+-        sendActivity: async (activity: unknown) => {
+-          const { text } = activity as { text?: string };
+-          attempts.push(text ?? "");
+-          if (attempts.length === 1) {
+-            throw Object.assign(new Error("throttled"), { statusCode: 429 });
+-          }
+-          return { id: `id:${text ?? ""}` };
+-        },
+-      };
+-
+       const adapter: MSTeamsAdapter = {
+-        continueConversation: async () => {},
++        continueConversation: async (_appId, _reference, logic) => {
++          await logic({
++            sendActivity: async (activity: unknown) => {
++              const { text } = activity as { text?: string };
++              attempts.push(text ?? "");
++              if (attempts.length === 1) {
++                throw Object.assign(new Error("throttled"), { statusCode: 429 });
++              }
++              return { id: `id:${text ?? ""}` };
++            },
++          });
++        },
+         process: async () => {},
+       };
+ 
+@@ -270,7 +270,6 @@ describe("msteams messenger", () => {
+         adapter,
+         appId: "app123",
+         conversationRef: baseRef,
+-        context: ctx,
+         messages: [{ text: "one" }],
+         retry: { maxAttempts: 2, baseDelayMs: 0, maxDelayMs: 0 },
+         onRetry: (e) => retryEvents.push({ nextAttempt: e.nextAttempt, delayMs: e.delayMs }),
+@@ -282,14 +281,14 @@ describe("msteams messenger", () => {
+     });
+ 
+     it("does not retry thread sends on client errors (4xx)", async () => {
+-      const ctx = {
+-        sendActivity: async () => {
+-          throw Object.assign(new Error("bad request"), { statusCode: 400 });
+-        },
+-      };
+-
+       const adapter: MSTeamsAdapter = {
+-        continueConversation: async () => {},
++        continueConversation: async (_appId, _reference, logic) => {
++          await logic({
++            sendActivity: async () => {
++              throw Object.assign(new Error("bad request"), { statusCode: 400 });
++            },
++          });
++        },
+         process: async () => {},
+       };
+ 
+@@ -299,7 +298,6 @@ describe("msteams messenger", () => {
+           adapter,
+           appId: "app123",
+           conversationRef: baseRef,
+-          context: ctx,
+           messages: [{ text: "one" }],
+           retry: { maxAttempts: 3, baseDelayMs: 0, maxDelayMs: 0 },
+         }),

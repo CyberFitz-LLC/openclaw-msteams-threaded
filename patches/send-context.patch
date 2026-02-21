@@ -1,0 +1,25 @@
+diff --git a/extensions/msteams/src/send-context.ts b/extensions/msteams/src/send-context.ts
+index af617a715..3229bd41b 100644
+--- a/extensions/msteams/src/send-context.ts
++++ b/extensions/msteams/src/send-context.ts
+@@ -119,7 +119,19 @@ export async function resolveMSTeamsSendContext(params: {
+     );
+   }
+ 
+-  const { conversationId, ref } = found;
++  const { conversationId: storeConversationId, ref } = found;
++  const conversationId =
++    recipient.type === "conversation" && recipient.id.includes(";messageid=")
++      ? recipient.id
++      : storeConversationId;
++  if (
++    recipient.type === "conversation" &&
++    recipient.id.includes(";messageid=") &&
++    ref.conversation
++  ) {
++    ref.conversation.id = recipient.id;
++  }
++
+   const core = getMSTeamsRuntime();
+   const log = core.logging.getChildLogger({ name: "msteams:send" });
+ 

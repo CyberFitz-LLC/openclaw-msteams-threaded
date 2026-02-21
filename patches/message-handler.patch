@@ -1,0 +1,82 @@
+diff --git a/extensions/msteams/src/monitor-handler/message-handler.ts b/extensions/msteams/src/monitor-handler/message-handler.ts
+index ac3f20adf..ef862800c 100644
+--- a/extensions/msteams/src/monitor-handler/message-handler.ts
++++ b/extensions/msteams/src/monitor-handler/message-handler.ts
+@@ -276,13 +276,19 @@ export function createMSTeamsMessageHandler(deps: MSTeamsMessageHandlerDeps) {
+ 
+     // Build conversation reference for proactive replies.
+     const agent = activity.recipient;
++    const isThreadMessage =
++      !isDirectMessage &&
++      msteamsCfg?.threadSessions === true &&
++      rawConversationId.includes(";messageid=");
++    const replyConversationId = isThreadMessage ? rawConversationId : conversationId;
++
+     const conversationRef: StoredConversationReference = {
+       activityId: activity.id,
+       user: { id: from.id, name: from.name, aadObjectId: from.aadObjectId },
+       agent,
+       bot: agent ? { id: agent.id, name: agent.name } : undefined,
+       conversation: {
+-        id: conversationId,
++        id: replyConversationId,
+         conversationType,
+         tenantId: conversation?.tenantId,
+       },
+@@ -335,17 +341,40 @@ export function createMSTeamsMessageHandler(deps: MSTeamsMessageHandlerDeps) {
+       : isChannel
+         ? `msteams:channel:${conversationId}`
+         : `msteams:group:${conversationId}`;
+-    const teamsTo = isDirectMessage ? `user:${senderId}` : `conversation:${conversationId}`;
++
++    const useThreadSessions = !isDirectMessage && msteamsCfg?.threadSessions === true;
++    const threadId = useThreadSessions
++      ? activity.conversation?.id?.match(/;messageid=(\d+)$/)?.[1]
++      : undefined;
++
++    const teamsTo = isDirectMessage
++      ? `user:${senderId}`
++      : threadId
++        ? `conversation:${conversationId};messageid=${threadId}`
++        : `conversation:${conversationId}`;
++
++    const peerId = isDirectMessage
++      ? senderId
++      : threadId
++        ? `${conversationId}:thread:${threadId}`
++        : conversationId;
+ 
+     const route = core.channel.routing.resolveAgentRoute({
+       cfg,
+       channel: "msteams",
+       peer: {
+         kind: isDirectMessage ? "direct" : isChannel ? "channel" : "group",
+-        id: isDirectMessage ? senderId : conversationId,
++        id: peerId,
+       },
+     });
+ 
++    if (!isDirectMessage && useThreadSessions) {
++      log.info("thread session resolved", {
++        sessionKey: route.sessionKey,
++        isThread: Boolean(threadId),
++      });
++    }
++
+     const preview = rawBody.replace(/\s+/g, " ").slice(0, 160);
+     const inboundLabel = isDirectMessage
+       ? `Teams DM from ${senderName}`
+@@ -493,6 +522,13 @@ export function createMSTeamsMessageHandler(deps: MSTeamsMessageHandlerDeps) {
+       storePath,
+       sessionKey: ctxPayload.SessionKey ?? route.sessionKey,
+       ctx: ctxPayload,
++      updateLastRoute: {
++        sessionKey: ctxPayload.SessionKey ?? route.sessionKey,
++        channel: "msteams",
++        to: teamsTo,
++        accountId: route.accountId,
++        threadId,
++      },
+       onRecordError: (err) => {
+         logVerboseMessage(`msteams: failed updating session meta: ${String(err)}`);
+       },

@@ -1,0 +1,25 @@
+diff --git a/src/config/types.msteams.ts b/src/config/types.msteams.ts
+index 359b9da8b..c05e4ff6f 100644
+--- a/src/config/types.msteams.ts
++++ b/src/config/types.msteams.ts
+@@ -104,6 +104,8 @@ export type MSTeamsConfig = {
+   teams?: Record<string, MSTeamsTeamConfig>;
+   /** Max media size in MB (default: 100MB for OneDrive upload support). */
+   mediaMaxMb?: number;
++  /** Enable per-thread session routing in channels/groups. Default: false. */
++  threadSessions?: boolean;
+   /** SharePoint site ID for file uploads in group chats/channels (e.g., "contoso.sharepoint.com,guid1,guid2"). */
+   sharePointSiteId?: string;
+   /** Heartbeat visibility settings for this channel. */
+diff --git a/src/config/zod-schema.providers-core.ts b/src/config/zod-schema.providers-core.ts
+index 0ac13ae8d..7578c987d 100644
+--- a/src/config/zod-schema.providers-core.ts
++++ b/src/config/zod-schema.providers-core.ts
+@@ -1034,6 +1034,7 @@ export const MSTeamsConfigSchema = z
+     teams: z.record(z.string(), MSTeamsTeamSchema.optional()).optional(),
+     /** Max media size in MB (default: 100MB for OneDrive upload support). */
+     mediaMaxMb: z.number().positive().optional(),
++    threadSessions: z.boolean().optional(),
+     /** SharePoint site ID for file uploads in group chats/channels (e.g., "contoso.sharepoint.com,guid1,guid2") */
+     sharePointSiteId: z.string().optional(),
+     heartbeat: ChannelHeartbeatVisibilitySchema,
